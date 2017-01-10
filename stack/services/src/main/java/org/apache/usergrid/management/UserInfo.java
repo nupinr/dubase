@@ -49,6 +49,14 @@ public class UserInfo {
     private boolean disabled;
     private Map<String, Object> properties;
     private boolean admin;
+    
+    /*
+     * --Nupin--start--
+     */
+    private UUID organizationId;
+    /*
+     * --end--
+     */
 
     public UserInfo() {}
 
@@ -81,6 +89,49 @@ public class UserInfo {
     }
 
 
+    /*
+     * --Nupin--start--
+     */
+    //extra param is added orgUser
+    public UserInfo( UUID organizationId, UUID applicationId, UUID id, String username, String name, String email, boolean confirmed,
+    		boolean activated, boolean disabled, Map<String, Object> properties, boolean admin , boolean orgUser) {
+    	this.applicationId = applicationId;
+    	this.organizationId = organizationId;
+    	this.id = id;
+    	this.username = username;
+    	this.name = name;
+    	this.email = email;
+    	this.confirmed = confirmed;
+    	this.activated = activated;
+    	this.disabled = disabled;
+    	this.properties = properties;
+    	this.admin = admin;
+    }    
+    
+    public UserInfo( UUID organizationId, UUID applicationId, Map<String, Object> properties, boolean orgUser ) {
+    	this.applicationId = applicationId;
+    	this.organizationId = organizationId;
+        id = uuid( properties.remove( PROPERTY_UUID ) );
+        username = string( properties.remove( PROPERTY_USERNAME ) );
+        name = string( properties.remove( PROPERTY_NAME ) );
+        email = string( properties.remove( PROPERTY_EMAIL ) );
+        confirmed = getBoolean( properties.remove( PROPERTY_CONFIRMED ) );
+        activated = getBoolean( properties.remove( PROPERTY_ACTIVATED ) );
+        disabled = getBoolean( properties.remove( PROPERTY_DISABLED ) );
+        admin = getBoolean( properties.remove( PROPERTY_ADMIN) );
+        this.properties = properties;
+    }
+    
+    
+    public UUID getOrganizationId() {
+        return organizationId;
+    }
+
+    
+    /*
+     * --end--
+     */
+    
     public UUID getApplicationId() {
         return applicationId;
     }

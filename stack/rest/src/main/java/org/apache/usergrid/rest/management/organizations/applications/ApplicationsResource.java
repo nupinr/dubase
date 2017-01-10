@@ -147,7 +147,7 @@ public class ApplicationsResource extends AbstractContextResource {
 
         String appName =
                 applicationName.contains( "/" ) ? applicationName : organization.getName() + "/" + applicationName;
-
+        
         ApplicationInfo application = management.getApplicationInfo( appName );
 
         if ( application == null ) {

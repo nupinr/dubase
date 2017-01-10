@@ -387,5 +387,47 @@ public interface ManagementService {
     void removeUserFromOrganizationPostProcessing( final UserInfo userInfo,
                                               final String organizationName,
                                               final Map<String, String> properties ) throws Exception;
+    
+    /*
+     * --Nupin--start
+     */
+    public List<UserInfo> getUsersForOrganization( UUID organizationId ) throws Exception;
+    
+    public UserInfo getUserByEmail( String email ) throws Exception;
+    
+    public void removeUserFromOrganization( UUID userId, UUID organizationId ) throws Exception;
+    
+    public UserInfo createUser( UUID organizationId, String username, String name, String email,
+                                     String password, boolean activated,
+                                     boolean disabled ) throws Exception;
+    
+    public void startUserPasswordResetFlow( UUID organizationId, UserInfo user ) throws Exception;
+
+    public void createUserPostProcessing( final UserInfo userInfo, final Map<String,String> properties);
+    
+    public void addUserToOrganization( UserInfo user, OrganizationInfo organization, boolean email )
+            throws Exception ;
+    
+    public void addUserToOrganization( User user, OrganizationInfo organization, String password )
+            throws Exception ;
+    
+    public UserInfo getUserByUuid( UUID id ) throws Exception;
+    
+    public UserInfo getUserByUsername( String username ) throws Exception;
+    
+    public void addUserToApplication( UserInfo user, ApplicationInfo application, UUID appId ) throws Exception;
+    
+    public void addUserToOrganizationPostProcessing( final User user, final String organizationName,
+                                                          final Map<String,String> properties);
+    
+    public UserInfo createUser( UUID organizationId, String username, String name, String email, String password,
+            boolean activated, boolean disabled, Map<String, Object> userProperties ) throws Exception;
+    
+    public UserInfo createOrgUser( UUID organizationId, User user, String password ) throws Exception;
+    
+    
+    /*
+     * --end--
+     */
 
 }

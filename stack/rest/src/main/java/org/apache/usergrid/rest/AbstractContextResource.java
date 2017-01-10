@@ -24,8 +24,10 @@ import com.google.inject.Injector;
 import net.tanesha.recaptcha.ReCaptcha;
 import net.tanesha.recaptcha.ReCaptchaFactory;
 import org.apache.commons.lang.StringUtils;
+import org.apache.usergrid.management.ApplicationInfo;
 import org.apache.usergrid.management.ManagementService;
 import org.apache.usergrid.management.OrganizationConfig;
+import org.apache.usergrid.management.OrganizationInfo;
 import org.apache.usergrid.mq.QueueManagerFactory;
 import org.apache.usergrid.persistence.EntityManagerFactory;
 import org.apache.usergrid.rest.exceptions.RedirectionException;
@@ -58,7 +60,14 @@ public abstract class AbstractContextResource {
     public final static String ROLE_SERVICE_ADMIN = "service-admin";
     public static final String USERGRID_SYSADMIN_LOGIN_NAME = "usergrid.sysadmin.login.name";
 
-
+    /*
+     * --Nupin--start--
+     */
+    private static final String defaultSpace = "dubase-" ;
+    /*
+     * --end--
+     */
+    
     protected AbstractContextResource parent;
 
     @Context
@@ -275,4 +284,37 @@ public abstract class AbstractContextResource {
         }
         return false;
     }
+    
+    /*
+     * --Nupin--start--
+     */
+    public ApplicationInfo getOrgAppSpace (OrganizationInfo organization) throws Exception {
+    	String orgSpace =
+    			organization.getName() + "/" + getDefaultSpaceName(organization.getName());
+
+    	return management.getApplicationInfo( orgSpace );
+    }
+    
+    public String getDefaultSpaceName( String organizationName ) {
+    	return defaultSpace+organizationName ;
+    } 
+    
+    public String getOrgSpace(OrganizationInfo organization) {
+    	return getOrgSpace(  organization.getName() );
+    }
+    
+    public String getOrgSpace( String organizationName ) {
+    	return  organizationName+ "/" + getDefaultSpaceName(organizationName); 
+    }
+    
+    public UUID getOrgSpaceId( OrganizationInfo organization ) throws Exception {
+    	return getOrgSpaceId( organization.getName() ) ;
+    }
+    
+    public UUID getOrgSpaceId( String organizationName ) throws Exception {
+    	return management.getApplicationInfo( getOrgSpace(organizationName) ).getId();
+    }
+    /*
+     * --end--
+     */
 }

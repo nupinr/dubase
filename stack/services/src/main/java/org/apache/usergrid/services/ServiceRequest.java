@@ -390,4 +390,31 @@ public class ServiceRequest {
     public List<ServiceParameter> getOriginalParameters() {
         return originalParameters;
     }
+    
+    /*
+     * --Nupin--start--
+     */
+    public ServiceResults executeDB() throws Exception {
+
+        // initServiceName();
+
+        ServiceResults results = null;
+        Service s = services.getService( serviceName );
+        if ( s != null ) {
+            results = s.invoke( action, this, null, payload );
+            if ( ( results != null ) && results.hasMoreRequests() ) {
+
+                results = invokeMultiple( results );
+            }
+        }
+
+        if ( results == null ) {
+            results = new ServiceResults( null, this, null, null, Type.GENERIC, null, null, null );
+        }
+
+        return results;
+    }
+    /*
+     * --end--
+     */
 }

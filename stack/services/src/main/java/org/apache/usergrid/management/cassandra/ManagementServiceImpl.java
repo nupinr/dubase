@@ -3558,5 +3558,338 @@ public class ManagementServiceImpl implements ManagementService {
                                                      final Map<String,String> properties){
         // do nothing, this is a hook for any classes extending the ManagementServiceInterface
     }
+    
+    /*
+     * --Nupin--start--
+     */
+    @Override
+    public List<UserInfo> getUsersForOrganization( UUID organizationId ) throws Exception {
+
+        if ( organizationId == null ) {
+            return null;
+        }
+
+        List<UserInfo> users = new ArrayList<>();
+
+      EntityManager em = emf.getEntityManager(smf.getManagementAppId());
+//        EntityManager em = emf.getEntityManager(organizationId);
+        
+        Results results =
+                em.getCollection(new SimpleEntityRef(Group.ENTITY_TYPE, organizationId), "users", null, 10000,
+                    Level.ALL_PROPERTIES, false);
+        for ( Entity entity : results.getEntities() ) {
+            users.add( getUserInfo( smf.getManagementAppId(), entity ) );
+//        	users.add( getUserInfo( organizationId, entity ) );
+        }
+
+        return users;
+    }
+    
+    @Override
+    public UserInfo getUserByEmail( String email ) throws Exception {
+        if ( email == null ) {
+            return null;
+        }
+        return getUserInfo(smf.getManagementAppId(),
+            getUserEntityByIdentifier(smf.getManagementAppId(), Identifier.fromEmail(email)));
+    }
+    
+    @Override
+    public void removeUserFromOrganization( UUID userId, UUID organizationId ) throws Exception {
+        removeAdminUserFromOrganization( userId, organizationId, false );
+    }
+    
+    @Override
+    public UserInfo createUser( UUID organizationId, String username, String name, String email,
+                                     String password, boolean activated,
+                                     boolean disabled ) throws Exception {
+        return createUser(organizationId, username, name, email, password, activated, disabled, null);
+    }
+    
+    @Override
+    public UserInfo createUser( UUID organizationId, String username, String name, String email, String password,
+                                     boolean activated, boolean disabled, Map<String, Object> userProperties )
+        throws Exception {
+
+        if ( !validateAdminInfo(username, name, email, password) ) {
+            return null;
+        }
+        return createUserInternal(
+            organizationId, username, name, email, password, activated, disabled, userProperties );
+    }
+    
+    protected UserInfo createUserInternal( UUID organizationId, String username, String name, String email,
+    		String password, boolean activated, boolean disabled,
+    		Map<String, Object> userProperties )
+    				throws Exception {
+
+
+    	logger.info( "createUserInternal: {}", username );
+
+    	Collection<String> policyVioliations = passwordPolicy.policyCheck( password, true );
+    	if ( !policyVioliations.isEmpty() ) {
+    		throw new PasswordPolicyViolationException( passwordPolicy.getDescription( true ), policyVioliations );
+    	}
+
+    	if ( username == null ) {
+    		username = email;
+    	}
+    	if ( name == null ) {
+    		name = email;
+    	}
+    	EntityManager em = emf.getEntityManager( smf.getManagementAppId() );
+    	User user = new User();
+    	user.setUsername( username );
+    	user.setName( name );
+    	user.setEmail( email );
+    	user.setActivated( activated );
+    	user.setConfirmed( !newAdminUsersRequireConfirmation() ); // only
+    	user.setDisabled( disabled );
+    	if ( userProperties != null ) {
+    		// double check no 'password' property just to be safe
+    		userProperties.remove( "password" );
+    		user.setProperties( userProperties );
+    	}
+    	user = em.create( user );
+
+    	return createOrgUser( organizationId, user, password );
+    }
+    
+    @Override
+    public void startUserPasswordResetFlow( UUID organizationId, UserInfo user ) throws Exception {
+        String token = getPasswordResetTokenForAdminUser( user.getUuid(), 0, organizationId );
+
+        OrganizationConfig orgConfig = organizationId != null ?
+                getOrganizationConfigByUuid(organizationId) : getOrganizationConfigForUserInfo(user);
+        String resetPropertyUrl = orgConfig.getFullUrlTemplate(WorkflowUrl.ADMIN_RESETPW_URL);
+        String reset_url = String.format(resetPropertyUrl, user.getUuid().toString())
+                + "?token=" + token;
+
+        Map<String, String> pageContext = hashMap( "reset_url", reset_url )
+                .map( "reset_url_base", resetPropertyUrl )
+                .map( "user_uuid", user.getUuid().toString() ).map( "raw_token", token );
+
+        sendHtmlMail( properties, user.getDisplayEmailAddress(), properties.getProperty( PROPERTIES_MAILER_EMAIL ),
+                "Password Reset", appendEmailFooter( emailMsg( pageContext, PROPERTIES_EMAIL_ADMIN_PASSWORD_RESET ) ) );
+    }
+    
+    @Override
+    public void createUserPostProcessing( final UserInfo userInfo, final Map<String,String> properties){
+        // do nothing, this is a hook for any classes extending the ManagementServiceInterface
+    }
+    
+    @Override
+    public void addUserToOrganization( UserInfo user, OrganizationInfo organization, boolean email )
+            throws Exception {
+
+        if ( ( user == null ) || ( organization == null ) ) {
+            return;
+        }
+
+        EntityManager em = emf.getEntityManager( smf.getManagementAppId() );
+
+        EntityRef orgRef = new SimpleEntityRef( Group.ENTITY_TYPE, organization.getUuid() );
+        EntityRef userRef = new SimpleEntityRef( User.ENTITY_TYPE, user.getUuid() );
+
+
+        if(em.isCollectionMember(orgRef, Schema.COLLECTION_USERS, userRef)) {
+            if(logger.isDebugEnabled()) {
+                logger.debug( "addAdminUserToOrganization - Found value: {} already in collection", user.getName() );
+            }
+            return;
+        }
+
+        em.addToCollection(orgRef, Schema.COLLECTION_USERS, userRef);
+
+        invalidateManagementAppAuthCache();
+
+        if ( email ) {
+            sendAdminUserInvitedEmail(user, organization);
+        }
+    }
+
+    @Override
+    public UserInfo getUserByUuid( UUID id ) throws Exception {
+        return getUserInfo(smf.getManagementAppId(),
+            getUserEntityByIdentifier(smf.getManagementAppId(), Identifier.fromUUID(id)));
+    }
+    
+    @Override
+    public UserInfo getUserByUsername( String username ) throws Exception {
+        if ( username == null ) {
+            return null;
+        }
+        return getUserInfo(smf.getManagementAppId(),
+            getUserEntityByIdentifier(smf.getManagementAppId(), Identifier.fromName(username)));
+    }
+    
+    @Override
+    public void addUserToApplication( UserInfo user, ApplicationInfo application, UUID appId )
+            throws Exception {
+
+        if ( ( user == null ) || ( application == null ) ) {
+            return;
+        }
+
+        EntityManager em = emf.getEntityManager( appId) ;
+
+        EntityRef appRef = new SimpleEntityRef( Application.ENTITY_TYPE, application.getId() );
+        EntityRef userRef = new SimpleEntityRef( User.ENTITY_TYPE, user.getUuid() );
+
+
+        if(em.isCollectionMember(appRef, Schema.COLLECTION_USERS, userRef)) {
+            if(logger.isDebugEnabled()) {
+                logger.debug( "addAdminUserToOrganization - Found value: {} already in collection", user.getName() );
+            }
+            return;
+        }
+
+        em.addToCollection(appRef, Schema.COLLECTION_USERS, userRef);
+
+        invalidateManagementAppAuthCache();
+        
+    }
+    
+    @Override
+    public void addUserToOrganization( User user, OrganizationInfo organization , String password)
+            throws Exception {
+
+    	//
+        createOrgUser( organization.getUuid(), user, password );
+        //
+    	
+        if ( ( user == null ) || ( organization == null ) ) {
+            return;
+        }
+
+        EntityManager em = emf.getEntityManager( smf.getManagementAppId() );
+//        EntityManager em = emf.getEntityManager( user.getUuid() );
+
+        EntityRef orgRef = new SimpleEntityRef( Group.ENTITY_TYPE, organization.getUuid() );
+        EntityRef userRef = new SimpleEntityRef( User.ENTITY_TYPE, user.getUuid() );
+
+
+        if(em.isCollectionMember(orgRef, Schema.COLLECTION_USERS, userRef)) {
+            if(logger.isDebugEnabled()) {
+                logger.debug( "addAdminUserToOrganization - Found value: {} already in collection", user.getName() );
+            }
+            return;
+        }
+        
+        em.addToCollection(orgRef, Schema.COLLECTION_USERS, userRef);
+
+        invalidateManagementAppAuthCache();
+
+    }
+    
+    @Override
+    public void addUserToOrganizationPostProcessing( final User user, final String organizationName,
+                                                          final Map<String,String> properties){
+        // do nothing, this is a hook for any classes extending the ManagementServiceInterface
+    }
+    
+    @Override
+    public UserInfo createOrgUser( UUID organizationId, User user, String password ) throws Exception {
+
+        Collection<String> policyVioliations = passwordPolicy.policyCheck( password, false );
+        if ( !policyVioliations.isEmpty() ) {
+            throw new PasswordPolicyViolationException( passwordPolicy.getDescription( true ), policyVioliations );
+        }
+
+        return doCreateOrgUser(organizationId, user,
+            encryptionService.defaultEncryptedCredentials(password, user.getUuid(), smf.getManagementAppId()),
+            encryptionService.plainTextCredentials(mongoPassword(user.getUsername(), password), user.getUuid(),
+                smf.getManagementAppId()));
+    }
+    
+    private UserInfo doCreateOrgUser( UUID organizationId, User user, CredentialsInfo userPassword, CredentialsInfo mongoPassword )
+            throws Exception {
+
+        writeUserToken( smf.getManagementAppId(), user, encryptionService
+                .plainTextCredentials( generateOAuthSecretKey( AuthPrincipalType.APPLICATION_USER ), user.getUuid(),
+                        smf.getManagementAppId() ) );
+
+        writeUserPassword( smf.getManagementAppId(), user, userPassword );
+
+        writeUserMongoPassword( smf.getManagementAppId(), user, mongoPassword );
+
+//        writeUserToken( organizationId, user, encryptionService
+//                .plainTextCredentials( generateOAuthSecretKey( AuthPrincipalType.ORGANIZATION ), user.getUuid(),
+//                        smf.getManagementAppId() ) );
+//
+//        writeUserPassword( organizationId, user, userPassword );
+//
+//        writeUserMongoPassword(organizationId, user, mongoPassword );
+//
+//        
+//        UserInfo userInfo = new UserInfo(
+//            organizationId, user.getUuid(), user.getUsername(), user.getName(),
+//            user.getEmail(), user.getConfirmed(), user.getActivated(), user.getDisabled(),
+//            user.getDynamicProperties(), false );
+        UserInfo userInfo = new UserInfo(
+                organizationId, user.getUuid(), user.getUsername(), user.getName(),
+                user.getEmail(), user.getConfirmed(), user.getActivated(), user.getDisabled(),
+                user.getDynamicProperties(), false );
+        
+        return userInfo;
+    }
+    
+    
+//    public UserInfo getUserInfo( UUID organizationId, Entity entity, boolean orgUser) {
+//
+//        if ( entity == null ) {
+//            return null;
+//        }
+//        return new UserInfo( organizationId, entity.getUuid(), ( String ) entity.getProperty( "username" ),
+//                entity.getName(), ( String ) entity.getProperty( "email" ),
+//                ConversionUtils.getBoolean( entity.getProperty( "confirmed" ) ),
+//                ConversionUtils.getBoolean( entity.getProperty( "activated" ) ),
+//                ConversionUtils.getBoolean( entity.getProperty( "disabled" ) ),
+//                entity.getDynamicProperties(),
+//                ConversionUtils.getBoolean( entity.getProperty( "admin" )), orgUser);
+//    }
+//
+//
+//    public UserInfo getUserInfo( UUID organizationId, Map<String, Object> properties, boolean orgUser ) {
+//
+//        if ( properties == null ) {
+//            return null;
+//        }
+//        return new UserInfo( organizationId, properties, orgUser );
+//    }
+//     
+//    protected boolean validateOrgUserInfo( String username, String name, String email, String password , UUID organizationId) throws Exception {
+//        if ( email == null ) {
+//            return false;
+//        }
+//        if ( username == null ) {
+//            username = email;
+//        }
+//
+//        EntityManager em = emf.getEntityManager(organizationId);
+//        if ( !( tokens.isExternalSSOProviderEnabled() && SubjectUtils.isServiceAdmin())
+//            && !em.isPropertyValueUniqueForEntity( "user", "username", username ) ) {
+//            throw new DuplicateUniquePropertyExistsException( "user", "username", username );
+//        }
+//
+//        if ( !(tokens.isExternalSSOProviderEnabled()&& SubjectUtils.isServiceAdmin())
+//            && !em.isPropertyValueUniqueForEntity( "user", "email", email ) ) {
+//            throw new DuplicateUniquePropertyExistsException( "user", "email", email );
+//        }
+//        return true;
+//    }
+
+//	@Override
+//    public UserInfo getUserByEmail(UUID organizationId, String email ) throws Exception {
+//        if ( email == null ) {
+//            return null;
+//        }
+//        return getUserInfo(organizationId,
+//                getUserEntityByIdentifier(organizationId, Identifier.fromEmail(email)));
+//    }
+
+    /*
+     * --end
+     */
 
 }

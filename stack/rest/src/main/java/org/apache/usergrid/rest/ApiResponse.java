@@ -45,6 +45,7 @@ import org.apache.usergrid.persistence.AggregateCounterSet;
 import org.apache.usergrid.persistence.Entity;
 import org.apache.usergrid.persistence.Results;
 import org.apache.usergrid.persistence.entities.Application;
+import org.apache.usergrid.persistence.entities.User;
 import org.apache.usergrid.rest.exceptions.UncaughtException;
 import org.apache.usergrid.security.oauth.ClientCredentialsInfo;
 import org.apache.usergrid.services.ServiceRequest;
@@ -56,7 +57,14 @@ import static org.apache.usergrid.utils.InflectionUtils.pluralize;
 
 @JsonPropertyOrder( {
         "action", "application", "params", "path", "query", "uri", "status", "error", "applications", "entity",
-        "entities", "list", "data", "next", "timestamp", "duration"
+        "entities", "list", "data", "next", "timestamp", "duration" 
+        /*
+         * --Nupin--start
+         */
+        , "user" , "users"
+        /*
+         * --end
+         */
 } )
 @XmlRootElement
 public class ApiResponse {
@@ -91,6 +99,16 @@ public class ApiResponse {
     private ClientCredentialsInfo credentials;
     private OrganizationConfig organizationConfig;
     private OrganizationConfig config; // used for URL building
+    
+    /*
+     * --Nupin--start
+     */
+    private String userName;
+    private UUID user;
+    private Map<String, UUID> users;
+    /*
+     * --end--
+     */
 
     protected Map<String, Object> properties = new TreeMap<>( String.CASE_INSENSITIVE_ORDER );
 
@@ -641,6 +659,15 @@ public class ApiResponse {
         if ( !Application.ENTITY_TYPE.equals( entity.getType() ) ) {
             entity_uri = createPath( pluralize( entity.getType() ), entity.getUuid().toString() );
         }
+        /*
+         * --Nupin--start-- for adding user
+         */
+        else if(User.ENTITY_TYPE.equals( entity.getType() ) ){
+        	entity_uri = createPathUser();
+        }
+        /*
+         * --end--
+         */
         else {
             entity_uri = createPath();
         }
@@ -696,4 +723,93 @@ public class ApiResponse {
 
         return builder.toString();
     }
+    
+    /*
+     * --Nupin--start--
+     */
+    
+    @JsonSerialize( include = Inclusion.NON_NULL )
+    public UUID getUser() {
+        return user;
+    }
+
+
+    @JsonSerialize( include = Inclusion.NON_NULL )
+    public String userName() {
+        return userName;
+    }
+    
+    /** Set the user and organization information */
+    public void setUser( User user ) {
+        this.organization = user.getOrganizationName();
+        this.userName = user.getUsername();
+        this.user = user.getUuid();
+        try {
+            this.config = management.getOrganizationConfigByName(this.organization);
+        }
+        catch (Exception e) {
+            // use defaults
+            this.config = management.getOrganizationConfigDefaultsOnly();
+        }
+
+        if ( esp != null ) {
+            uri = createPath( esp.toString() );
+        }
+    }
+    
+    @JsonSerialize( include = Inclusion.NON_NULL )
+    public Map<String, UUID> getUsers() {
+        return users;
+    }
+
+
+    public void setUsers( Map<String, UUID> users ) {
+        this.users = users;
+    }
+
+    public ApiResponse withUsers( Map<String, UUID> users ) {
+        this.users = users;
+        return this;
+    }
+    
+    /**
+     * Create a path
+     *
+     * @return `
+     */
+    private String createPathUser( String... suffixes ) {
+
+        StringBuilder builder = new StringBuilder();
+
+        String apiBase = config.getProperty(OrganizationConfigProps.ORGPROPERTIES_API_URL_BASE);
+        builder.append( apiBase );
+        if ( !apiBase.endsWith( "/" ) ) {
+            builder.append( "/" );
+        }
+        builder.append( organization );
+        builder.append( "/" );
+        builder.append( userName );
+
+        if ( suffixes.length == 0 ) {
+            return builder.toString();
+        }
+
+
+        for ( String current : suffixes ) {
+            if ( current == null ) {
+                continue;
+            }
+
+            if ( !current.startsWith( "/" ) ) {
+                builder.append( "/" );
+            }
+            builder.append( current );
+        }
+
+        return builder.toString();
+    }
+    
+    /*
+     * --end--
+     */
 }

@@ -117,6 +117,13 @@ public class SwaggerServlet extends HttpServlet implements Filter {
         pathToJson.put( "/resources.json", loadTempate( "/swagger/resources.json" ) );
         pathToJson.put( "/applications.json", loadTempate( "/swagger/applications.json" ) );
         pathToJson.put( "/management.json", loadTempate( "/swagger/management.json" ) );
+        /*
+         * --Nupin--start--
+         */
+        pathToJson.put( "/users.json", loadTempate( "/swagger/users.json" ) );
+        /*
+         * --end--
+         */
     }
 
 

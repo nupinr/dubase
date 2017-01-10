@@ -105,6 +105,15 @@ public class User extends TypedEntity {
 
     @EntityCollection(type = "role", linkedCollection = "users", indexingDynamicDictionaries = true)
     protected List<UUID> roles;
+    
+    /*
+     * --Nupin--start--
+     */
+    @EntityCollection(type = "application" , linkedCollection = "users")
+    protected List<UUID> applications ;
+    /*
+     * --end--
+     */
 
     @JsonIgnore
     @EntityDictionary(keyType = String.class, valueType = CredentialsInfo.class)
@@ -347,4 +356,27 @@ public class User extends TypedEntity {
     public void setRoles( List<UUID> roles ) {
         this.roles = roles;
     }
+
+    //--Nupin--start--
+	public List<UUID> getApplications() {
+		return applications;
+	}
+
+	 @JsonSerialize(include = Inclusion.NON_NULL)
+	public void setApplications(List<UUID> applications) {
+		this.applications = applications;
+	}
+	 
+	 /** Get the organization name of this app */
+	 public String getOrganizationName() {
+		 String[] names = name.split( "/" );
+
+		 if ( names.length == 2 ) {
+			 return names[0];
+		 }
+
+		 return null;
+	 }
+    //---end---
+    
 }

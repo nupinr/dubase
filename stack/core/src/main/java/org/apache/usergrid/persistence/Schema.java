@@ -163,6 +163,17 @@ public class Schema implements SchemaManager {
     public static final String DICTIONARY_ID_SETS = "id_sets";
     public static final String DICTIONARY_COUNTERS = "counters";
     public static final String DICTIONARY_GEOCELL = "geocell";
+    
+    /*
+     * --Nupin--start--
+     */
+    public static final String ENTITY_CREATED_BY = "created_user";
+    public static final String ENTITY_UPDATED_BY = "updated_user";
+    public static final String ENTITY_CREATED_APP = "created_app";
+    public static final String ENTITY_UPDATED_APP = "updated_app";
+    /*
+     * --end--
+     */
 
     private static final List<String> entitiesPackage = new ArrayList<String>();
     private static final List<String> entitiesScanPath = new ArrayList<String>();

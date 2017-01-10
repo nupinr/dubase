@@ -755,4 +755,13 @@ public interface EntityManager {
      */
     void initializeIndex();
     EntityIndex.IndexRefreshCommandInfo refreshIndex();
+    
+    /*
+     * --Nupin--start--
+     */
+    public Entity createItemInCollection( EntityRef entityRef, EntityRef entityOrgRef, String collectionName,
+            String itemType, Map<String, Object> props ) throws Exception;
+    /*
+     * --end--
+     */
 }

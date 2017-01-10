@@ -43,7 +43,13 @@ public class ServiceContext {
     String serviceMetadata;
     String collectionName;
     String serviceCommand;
-
+    /*
+     * --Nupin--start--
+     */
+    EntityRef orgOwner;
+    /*
+     * --end--
+     */
 
     public ServiceContext() {
     }
@@ -77,6 +83,40 @@ public class ServiceContext {
         this.payload = payload;
     }
 
+    /*
+     * --Nupin--start--
+     */
+    public ServiceContext( Service service, ServiceAction action, ServiceRequest request,
+    						ServiceResults previousResults, EntityRef owner, String collectionName,
+    						List<ServiceParameter> parameters, ServicePayload payload, EntityRef orgOwner) {
+    	this.service = service;
+    	this.action = action;
+    	this.request = request;
+    	this.previousResults = previousResults;
+    	this.owner = owner;
+    	this.collectionName = collectionName;
+    	this.parameters = parameters;
+    	this.payload = payload;
+    	this.orgOwner = orgOwner;
+    }
+    
+    public ServiceContext( Service service, ServiceAction action, ServiceRequest request,
+    					ServiceResults previousResults, EntityRef owner, String collectionName, Query query,
+    					List<ServiceParameter> parameters, ServicePayload payload, EntityRef orgOwner ) {
+    	this.service = service;
+    	this.action = action;
+    	this.request = request;
+    	this.previousResults = previousResults;
+    	this.owner = owner;
+    	this.collectionName = collectionName;
+    	this.query = query;
+    	this.parameters = parameters;
+    	this.payload = payload;
+    	this.orgOwner = orgOwner;
+    }
+    /*
+     * --end--
+     */
 
     public ServiceAction getAction() {
         return action;

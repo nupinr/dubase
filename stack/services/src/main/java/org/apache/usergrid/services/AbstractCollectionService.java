@@ -441,6 +441,8 @@ public class AbstractCollectionService extends AbstractService {
                 try {
                     item = em.createItemInCollection( context.getOwner(), context.getCollectionName(), getEntityType(),
                             p );
+//                	item = em.createItemInCollection( context.getOwner(), context.getOrgOwner(), context.getCollectionName(), getEntityType(),
+//                            p );
                 }
                 catch ( Exception e ) {
 
@@ -463,7 +465,7 @@ public class AbstractCollectionService extends AbstractService {
             }
             return new ServiceResults( this, context, Type.COLLECTION, Results.fromEntities( entities ), null, null );
         }
-
+        
         Entity item = em.createItemInCollection( context.getOwner(), context.getCollectionName(), getEntityType(),
                 context.getProperties() );
 

@@ -1526,6 +1526,12 @@ public class CpEntityManager implements EntityManager {
         return getRelationManager( entityRef ).createItemInCollection( collectionName, itemType, props );
     }
 
+    @Override
+    public Entity createItemInCollection( EntityRef entityRef, EntityRef entityOrgRef, String collectionName,
+            String itemType, Map<String, Object> props ) throws Exception {
+
+        return getRelationManager( entityOrgRef ).createItemInCollection( collectionName, itemType, props );
+    }
 
     @Override
     public void removeFromCollection( EntityRef entityRef, String collectionName, EntityRef itemRef ) throws Exception {
@@ -2704,8 +2710,19 @@ public class CpEntityManager implements EntityManager {
             }
         }
 
-        UUID itemId = UUIDGenerator.newTimeUUID();
-
+        /*
+         * Need to validate 
+         * 1) check user already exists in organization with the UUID or mail or username
+         * 2) Throwing error
+         */
+        
+        UUID itemId ;
+        if(properties.get("uuid")!=null) {
+        	//Need to validate if the user exists in organization .
+        	itemId = Identifier.from(properties.get("uuid")).getUUID() ;
+        } else {
+        	itemId = UUIDGenerator.newTimeUUID();
+        }
         if ( is_application ) {
             itemId = applicationId;
         }
@@ -2755,9 +2772,24 @@ public class CpEntityManager implements EntityManager {
             return null;
         }
 
+        String property_type = Schema.normalizeEntityType( entityType, false ) ;
+        
         properties.put( PROPERTY_UUID, itemId );
-        properties.put( PROPERTY_TYPE, Schema.normalizeEntityType( entityType, false ) );
+        properties.put( PROPERTY_TYPE, property_type );
 
+        /*
+         * --Nupin--start--
+         */
+        if( application != null ) {
+        	properties.put(ENTITY_CREATED_APP, application.getName());
+         	properties.put(ENTITY_UPDATED_APP, application.getName());
+        }
+//         properties.put(ENTITY_CREATED_BY,application);
+//         properties.put(ENTITY_UPDATED_BY, );
+        /*
+         * --end--
+         */
+        
         if ( importId != null ) {
             if ( properties.get( PROPERTY_CREATED ) == null ) {
                 properties.put( PROPERTY_CREATED, ( long ) ( timestamp / 1000 ) );

@@ -21,7 +21,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.jaxrs.json.annotation.JSONP;
 import net.tanesha.recaptcha.ReCaptchaImpl;
 import net.tanesha.recaptcha.ReCaptchaResponse;
+
+import org.apache.usergrid.management.OrganizationInfo;
+import org.apache.usergrid.management.UserInfo;
 import org.apache.usergrid.persistence.Entity;
+import org.apache.usergrid.persistence.EntityManager;
 import org.apache.usergrid.persistence.Query;
 import org.apache.usergrid.persistence.entities.User;
 import org.apache.usergrid.persistence.index.query.Identifier;
@@ -32,6 +36,7 @@ import org.apache.usergrid.rest.applications.ServiceResource;
 import org.apache.usergrid.rest.exceptions.RedirectionException;
 import org.apache.usergrid.rest.security.annotations.CheckPermissionsForPath;
 import org.apache.usergrid.rest.security.annotations.RequireApplicationAccess;
+import org.apache.usergrid.services.ServiceManager;
 import org.glassfish.jersey.server.mvc.Viewable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,6 +48,8 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.PathSegment;
 import javax.ws.rs.core.UriInfo;
+
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -57,237 +64,348 @@ import static org.apache.usergrid.services.ServiceParameter.addParameter;
 @Produces(MediaType.APPLICATION_JSON)
 public class UsersResource extends ServiceResource {
 
-    private static final Logger logger = LoggerFactory.getLogger( UsersResource.class );
+	private static final Logger logger = LoggerFactory.getLogger( UsersResource.class );
 
-    String errorMsg;
-    User user;
-
-
-    public UsersResource() {
-    }
+	String errorMsg;
+	User user;
 
 
-    @Override
-    @Path(RootResource.ENTITY_ID_PATH)
-    public AbstractContextResource addIdParameter( @Context UriInfo ui, @PathParam("entityId") PathSegment entityId )
-            throws Exception {
-
-        if(logger.isTraceEnabled()){
-            logger.trace( "ServiceResource.addIdParameter" );
-        }
-
-        UUID itemId = UUID.fromString( entityId.getPath() );
-
-        addParameter( getServiceParameters(), itemId );
-
-        addMatrixParams( getServiceParameters(), ui, entityId );
-
-        return getSubResource( UserResource.class ).init( Identifier.fromUUID( itemId ) );
-    }
+	public UsersResource() {
+	}
 
 
-    @Override
-    @Path("{itemName}")
-    public AbstractContextResource addNameParameter( @Context UriInfo ui, @PathParam("itemName") PathSegment itemName)
-            throws Exception {
+	@Override
+	@Path(RootResource.ENTITY_ID_PATH)
+	public AbstractContextResource addIdParameter( @Context UriInfo ui, @PathParam("entityId") PathSegment entityId )
+			throws Exception {
 
-        if(logger.isTraceEnabled()){
-            logger.trace( "ServiceResource.addNameParameter" );
-            logger.trace( "Current segment is {}", itemName.getPath() );
-        }
+		if(logger.isTraceEnabled()){
+			logger.trace( "ServiceResource.addIdParameter" );
+		}
 
-        if ( itemName.getPath().startsWith( "{" ) ) {
-            Query query = Query.fromJsonString( itemName.getPath() );
-            if ( query != null ) {
-                addParameter( getServiceParameters(), query );
-            }
-            addMatrixParams( getServiceParameters(), ui, itemName );
+		UUID itemId = UUID.fromString( entityId.getPath() );
 
-            return getSubResource( ServiceResource.class );
-        }
+		addParameter( getServiceParameters(), itemId );
 
-        addParameter( getServiceParameters(), itemName.getPath() );
+		addMatrixParams( getServiceParameters(), ui, entityId );
 
-        addMatrixParams( getServiceParameters(), ui, itemName );
-
-        String forceString = ui.getQueryParameters().getFirst("force");
-
-        Identifier id;
-        if (forceString != null && "email".equals(forceString.toLowerCase())) {
-            id = Identifier.fromEmail(itemName.getPath().toLowerCase());
-        } else if (forceString != null && "name".equals(forceString.toLowerCase())) {
-            id = Identifier.fromName(itemName.getPath().toLowerCase());
-        } else {
-            id = Identifier.from(itemName.getPath());
-        }
-        if ( id == null ) {
-            throw new IllegalArgumentException( "Not a valid user identifier: " + itemName.getPath() );
-        }
-        return getSubResource( UserResource.class ).init( id );
-    }
+		return getSubResource( UserResource.class ).init( Identifier.fromUUID( itemId ) );
+	}
 
 
-    @GET
-    @Path("resetpw")
-    @Produces(MediaType.TEXT_HTML)
-    public Viewable showPasswordResetForm( @Context UriInfo ui ) {
-        return handleViewable( "resetpw_email_form", this, getOrganizationName() );
-    }
+	@Override
+	@Path("{itemName}")
+	public AbstractContextResource addNameParameter( @Context UriInfo ui, @PathParam("itemName") PathSegment itemName)
+			throws Exception {
+
+		if(logger.isTraceEnabled()){
+			logger.trace( "ServiceResource.addNameParameter" );
+			logger.trace( "Current segment is {}", itemName.getPath() );
+		}
+
+		if ( itemName.getPath().startsWith( "{" ) ) {
+			Query query = Query.fromJsonString( itemName.getPath() );
+			if ( query != null ) {
+				addParameter( getServiceParameters(), query );
+			}
+			addMatrixParams( getServiceParameters(), ui, itemName );
+
+			return getSubResource( ServiceResource.class );
+		}
+
+		addParameter( getServiceParameters(), itemName.getPath() );
+
+		addMatrixParams( getServiceParameters(), ui, itemName );
+
+		String forceString = ui.getQueryParameters().getFirst("force");
+
+		Identifier id;
+		if (forceString != null && "email".equals(forceString.toLowerCase())) {
+			id = Identifier.fromEmail(itemName.getPath().toLowerCase());
+		} else if (forceString != null && "name".equals(forceString.toLowerCase())) {
+			id = Identifier.fromName(itemName.getPath().toLowerCase());
+		} else {
+			id = Identifier.from(itemName.getPath());
+		}
+		if ( id == null ) {
+			throw new IllegalArgumentException( "Not a valid user identifier: " + itemName.getPath() );
+		}
+		return getSubResource( UserResource.class ).init( id );
+	}
 
 
-    @POST
-    @Path("resetpw")
-    @Consumes("application/x-www-form-urlencoded")
-    @Produces(MediaType.TEXT_HTML)
-    public Viewable handlePasswordResetForm( @Context UriInfo ui, @FormParam("email") String email,
-                                             @FormParam("recaptcha_challenge_field") String challenge,
-                                             @FormParam("recaptcha_response_field") String uresponse ) {
+	@GET
+	@Path("resetpw")
+	@Produces(MediaType.TEXT_HTML)
+	public Viewable showPasswordResetForm( @Context UriInfo ui ) {
+		return handleViewable( "resetpw_email_form", this, getOrganizationName() );
+	}
 
-        try {
-            ReCaptchaImpl reCaptcha = new ReCaptchaImpl();
-            reCaptcha.setPrivateKey( properties.getRecaptchaPrivate() );
 
-            ReCaptchaResponse reCaptchaResponse =
-                    reCaptcha.checkAnswer( httpServletRequest.getRemoteAddr(), challenge, uresponse );
+	@POST
+	@Path("resetpw")
+	@Consumes("application/x-www-form-urlencoded")
+	@Produces(MediaType.TEXT_HTML)
+	public Viewable handlePasswordResetForm( @Context UriInfo ui, @FormParam("email") String email,
+			@FormParam("recaptcha_challenge_field") String challenge,
+			@FormParam("recaptcha_response_field") String uresponse ) {
 
-            if ( isBlank( email ) ) {
-                errorMsg = "No email provided, try again...";
-                return handleViewable( "resetpw_email_form", this, getOrganizationName() );
-            }
+		try {
+			ReCaptchaImpl reCaptcha = new ReCaptchaImpl();
+			reCaptcha.setPrivateKey( properties.getRecaptchaPrivate() );
 
-            if ( !useReCaptcha() || reCaptchaResponse.isValid() ) {
-                user = management.getAppUserByIdentifier( getApplicationId(), Identifier.fromEmail( email ) );
-                if ( user != null ) {
-                    management.startAppUserPasswordResetFlow( getApplicationId(), user );
-                    return handleViewable( "resetpw_email_success", this, getOrganizationName() );
-                }
-                else {
-                    errorMsg = "We don't recognize that email, try again...";
-                    return handleViewable( "resetpw_email_form", this, getOrganizationName() );
-                }
+			ReCaptchaResponse reCaptchaResponse =
+					reCaptcha.checkAnswer( httpServletRequest.getRemoteAddr(), challenge, uresponse );
+
+			if ( isBlank( email ) ) {
+				errorMsg = "No email provided, try again...";
+				return handleViewable( "resetpw_email_form", this, getOrganizationName() );
+			}
+
+			if ( !useReCaptcha() || reCaptchaResponse.isValid() ) {
+				user = management.getAppUserByIdentifier( getApplicationId(), Identifier.fromEmail( email ) );
+				if ( user != null ) {
+					management.startAppUserPasswordResetFlow( getApplicationId(), user );
+					return handleViewable( "resetpw_email_success", this, getOrganizationName() );
+				}
+				else {
+					errorMsg = "We don't recognize that email, try again...";
+					return handleViewable( "resetpw_email_form", this, getOrganizationName() );
+				}
+			}
+			else {
+				errorMsg = "Incorrect Captcha, try again...";
+				return handleViewable( "resetpw_email_form", this, getOrganizationName() );
+			}
+		}
+		catch ( RedirectionException e ) {
+			throw e;
+		}
+		catch ( Exception e ) {
+			return handleViewable( "resetpw_email_form", e, getOrganizationName() );
+		}
+	}
+
+
+	public String getErrorMsg() {
+		return errorMsg;
+	}
+
+
+	public User getUser() {
+		return user;
+	}
+
+
+	@PUT
+	@Override
+	@RequireApplicationAccess
+	@JSONP
+	@Produces({MediaType.APPLICATION_JSON, "application/javascript"})
+	public ApiResponse executePut( @Context UriInfo ui, String body,
+			@QueryParam("callback") @DefaultValue("callback") String callback )
+					throws Exception {
+
+		ObjectMapper mapper = new ObjectMapper();
+		Map<String, Object> json = mapper.readValue( body, mapTypeReference );
+
+		if ( "me".equals( json.get("username") ) ) {
+			throw new IllegalArgumentException( "Username 'me' is reserved" );
+		}
+
+		User user = getUser();
+		if ( user == null ) {
+			return executePost( ui, body, callback );
+		}
+		if ( json != null ) {
+			json.remove( "password" );
+			json.remove( "pin" );
+		}
+		return super.executePutWithMap( ui, json, callback );
+	}
+
+	
+
+	@CheckPermissionsForPath
+	@POST
+	@Override
+	@JSONP
+	@Produces({MediaType.APPLICATION_JSON, "application/javascript"})
+	public ApiResponse executePost( @Context UriInfo ui, String body,
+			@QueryParam("callback") @DefaultValue("callback") String callback )
+					throws Exception {
+
+		if(logger.isTraceEnabled()){
+			logger.trace( "UsersResource.executePost: body = {}", body);
+		}
+
+		Object json = readJsonToObject( body );
+
+		String password = null;
+		String pin = null;   
+		/*
+		 * --Nupin--start--
+		 */
+		boolean orgToApp ;
+		String username = null ;
+		String email = null ;
+		String name = null ;
+		/*
+		 * --end--
+		 */
+
+		Boolean confRequred = (Boolean)this.getServices().getEntityManager().getProperty(
+				this.getServices().getApplicationRef(), "registration_requires_email_confirmation" );
+
+		boolean activated = !( ( confRequred != null ) && confRequred );
+
+		if(logger.isTraceEnabled()){
+			logger.trace("Confirmation required: {} Activated: {}", confRequred, activated );
+		}
+
+		if ( json instanceof Map ) {
+			@SuppressWarnings("unchecked") Map<String, Object> map = ( Map<String, Object> ) json;
+
+			if ( "me".equals( map.get("username") ) ) {
+				throw new IllegalArgumentException( "Username 'me' is reserved" );
+			}
+
+			password = ( String ) map.get( "password" );
+			map.remove( "password" );
+			pin = ( String ) map.get( "pin" );
+			map.remove( "pin" );
+			map.put( "activated", activated );
+			/*
+			 * --Nupin--start--
+			 */
+			orgToApp =  map.get("orgtoapp")!=null ? Boolean.parseBoolean(map.get("orgtoapp").toString()) : false;
+			if(!orgToApp) {
+			name =  ( String ) map.get( "name" );
+			username =  ( String ) map.get( "username" );
+			email =  ( String ) map.get( "email" );
+			//adding user to org and passing uuid to create new app user
+//			UserInfo userInfo = newUserToOrgFromApp(username, name, email, password) ;
+//			map.put("uuid", userInfo.getUuid());
+			//
+			}
+			/*
+			 * --end--
+			 */
+		}
+		else if ( json instanceof List ) {
+			@SuppressWarnings("unchecked") List<Object> list = ( List<Object> ) json;
+			for ( Object obj : list ) {
+				if ( obj instanceof Map ) {
+					@SuppressWarnings("unchecked") Map<String, Object> map = ( Map<String, Object> ) obj;
+					map.remove( "password" );
+					map.remove( "pin" );
+				}
+			}
+		}
+
+		ApiResponse response = super.executePostWithObject( ui, json, callback );
+
+		if ( ( response.getEntities() != null ) && ( response.getEntities().size() == 1 ) ) {
+
+			Entity entity = response.getEntities().get( 0 );
+			User user = ( User ) entity.toTypedEntity();
+
+			if ( isNotBlank( password ) ) {
+				management.setAppUserPassword( getApplicationId(), user.getUuid(), password );
+			}
+
+			if ( isNotBlank( pin ) ) {
+				management.setAppUserPin( getApplicationId(), user.getUuid(), pin );
+			}
+
+			if ( !activated ) {
+				management.startAppUserActivationFlow( getApplicationId(), user );
+			}
+
+		}
+
+		return response;
+	}
+
+	public UserInfo newUserToOrgFromApp( String username, String name, String email,
+    		String password ) throws Exception {
+
+        logger.info( "New user for organization: {} ({})", username, email);
+
+        ApiResponse response = createApiResponse();
+        response.setAction( "create user" );
+
+        UserInfo user = management.getUserByEmail( email );
+        
+        OrganizationInfo organization = management.getOrganizationByName(getOrganizationName());
+
+        if ( user == null ) {
+
+            if ( tokens.isExternalSSOProviderEnabled() ){
+                //autoactivating user, since the activation is done via the external sso provider.
+                user = management.createUser(organization.getUuid(),username,name,email,password,true,false);
             }
             else {
-                errorMsg = "Incorrect Captcha, try again...";
-                return handleViewable( "resetpw_email_form", this, getOrganizationName() );
-            }
-        }
-        catch ( RedirectionException e ) {
-            throw e;
-        }
-        catch ( Exception e ) {
-            return handleViewable( "resetpw_email_form", e, getOrganizationName() );
-        }
-    }
-
-
-    public String getErrorMsg() {
-        return errorMsg;
-    }
-
-
-    public User getUser() {
-        return user;
-    }
-
-
-    @PUT
-    @Override
-    @RequireApplicationAccess
-    @JSONP
-    @Produces({MediaType.APPLICATION_JSON, "application/javascript"})
-    public ApiResponse executePut( @Context UriInfo ui, String body,
-                                       @QueryParam("callback") @DefaultValue("callback") String callback )
-            throws Exception {
-
-        ObjectMapper mapper = new ObjectMapper();
-        Map<String, Object> json = mapper.readValue( body, mapTypeReference );
-
-        if ( "me".equals( json.get("username") ) ) {
-            throw new IllegalArgumentException( "Username 'me' is reserved" );
-        }
-
-        User user = getUser();
-        if ( user == null ) {
-            return executePost( ui, body, callback );
-        }
-        if ( json != null ) {
-            json.remove( "password" );
-            json.remove( "pin" );
-        }
-        return super.executePutWithMap( ui, json, callback );
-    }
-
-
-    @CheckPermissionsForPath
-    @POST
-    @Override
-    @JSONP
-    @Produces({MediaType.APPLICATION_JSON, "application/javascript"})
-    public ApiResponse executePost( @Context UriInfo ui, String body,
-                                        @QueryParam("callback") @DefaultValue("callback") String callback )
-            throws Exception {
-
-        if(logger.isTraceEnabled()){
-            logger.trace( "UsersResource.executePost: body = {}", body);
-        }
-
-        Object json = readJsonToObject( body );
-
-        String password = null;
-        String pin = null;
-
-        Boolean confRequred = (Boolean)this.getServices().getEntityManager().getProperty(
-            this.getServices().getApplicationRef(), "registration_requires_email_confirmation" );
-
-        boolean activated = !( ( confRequred != null ) && confRequred );
-
-        if(logger.isTraceEnabled()){
-            logger.trace("Confirmation required: {} Activated: {}", confRequred, activated );
-        }
-
-        if ( json instanceof Map ) {
-            @SuppressWarnings("unchecked") Map<String, Object> map = ( Map<String, Object> ) json;
-
-            if ( "me".equals( map.get("username") ) ) {
-                throw new IllegalArgumentException( "Username 'me' is reserved" );
-            }
-
-            password = ( String ) map.get( "password" );
-            map.remove( "password" );
-            pin = ( String ) map.get( "pin" );
-            map.remove( "pin" );
-            map.put( "activated", activated );
-        }
-        else if ( json instanceof List ) {
-            @SuppressWarnings("unchecked") List<Object> list = ( List<Object> ) json;
-            for ( Object obj : list ) {
-                if ( obj instanceof Map ) {
-                    @SuppressWarnings("unchecked") Map<String, Object> map = ( Map<String, Object> ) obj;
-                    map.remove( "password" );
-                    map.remove( "pin" );
+                user = management.createUser(organization.getUuid(), username, name, email, password, false, false);
+                // A null may be returned if the user fails validation check
+                if (user != null) {
+                    management.startUserPasswordResetFlow(organization.getUuid(), user);
                 }
             }
+
+            // DO NOT REMOVE - used for external classes to hook into any post-processing
+            management.createUserPostProcessing(user, null);
         }
 
-        ApiResponse response = super.executePostWithObject( ui, json, callback );
-
-        if ( ( response.getEntities() != null ) && ( response.getEntities().size() == 1 ) ) {
-
-            Entity entity = response.getEntities().get( 0 );
-            User user = ( User ) entity.toTypedEntity();
-
-            if ( isNotBlank( password ) ) {
-                management.setAppUserPassword( getApplicationId(), user.getUuid(), password );
-            }
-
-            if ( isNotBlank( pin ) ) {
-                management.setAppUserPin( getApplicationId(), user.getUuid(), pin );
-            }
-
-            if ( !activated ) {
-                management.startAppUserActivationFlow( getApplicationId(), user );
-            }
+        if ( user == null ) {
+            return null;
         }
-        return response;
-    }
+
+        management.addUserToOrganization( user, organization, true );
+
+        // DO NOT REMOVE - used for external classes to hook into any post-processing
+        management.addUserToOrganizationPostProcessing(user, organization.getName(), null);
+
+        return user ;
+    }    
+	
+	@Path("permissions")
+	public AbstractContextResource addPermission( @Context UriInfo ui, @PathParam("itemName") PathSegment itemName)
+			throws Exception {
+
+		if(logger.isTraceEnabled()){
+			logger.trace( "ServiceResource.addNameParameter" );
+			logger.trace( "Current segment is {}", itemName.getPath() );
+		}
+
+		if ( itemName.getPath().startsWith( "{" ) ) {
+			Query query = Query.fromJsonString( itemName.getPath() );
+			if ( query != null ) {
+				addParameter( getServiceParameters(), query );
+			}
+			addMatrixParams( getServiceParameters(), ui, itemName );
+
+			return getSubResource( ServiceResource.class );
+		}
+
+		addParameter( getServiceParameters(), itemName.getPath() );
+
+		addMatrixParams( getServiceParameters(), ui, itemName );
+
+		String forceString = ui.getQueryParameters().getFirst("force");
+
+		Identifier id;
+		if (forceString != null && "email".equals(forceString.toLowerCase())) {
+			id = Identifier.fromEmail(itemName.getPath().toLowerCase());
+		} else if (forceString != null && "name".equals(forceString.toLowerCase())) {
+			id = Identifier.fromName(itemName.getPath().toLowerCase());
+		} else {
+			id = Identifier.from(itemName.getPath());
+		}
+		if ( id == null ) {
+			throw new IllegalArgumentException( "Not a valid user identifier: " + itemName.getPath() );
+		}
+		return getSubResource( UserResource.class ).init( id );
+	}
+
 }

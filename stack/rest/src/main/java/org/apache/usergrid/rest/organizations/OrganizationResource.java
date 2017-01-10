@@ -16,15 +16,13 @@
  */
 package org.apache.usergrid.rest.organizations;
 
-
-import com.google.common.base.Optional;
-import com.google.common.collect.BiMap;
 import org.apache.shiro.authz.UnauthorizedException;
 import org.apache.usergrid.exception.NotImplementedException;
 import org.apache.usergrid.management.OrganizationInfo;
 import org.apache.usergrid.rest.AbstractContextResource;
 import org.apache.usergrid.rest.RootResource;
 import org.apache.usergrid.rest.applications.ApplicationResource;
+import org.apache.usergrid.rest.applications.users.UsersResource;
 import org.apache.usergrid.rest.exceptions.NoOpException;
 import org.apache.usergrid.rest.exceptions.OrganizationApplicationNotFoundException;
 import org.apache.usergrid.rest.security.annotations.RequireOrganizationAccess;
@@ -35,6 +33,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
+
+import com.google.common.collect.BiMap;
 
 import javax.ws.rs.*;
 import javax.ws.rs.core.Context;
@@ -124,11 +124,19 @@ public class OrganizationResource extends AbstractContextResource {
         return getApplicationById( applicationId );
     }
 
-
-    @Path("{applicationName}")
-    public ApplicationResource getApplicationByName( @PathParam("applicationName") String applicationName )
+    /*
+     * --Nupin--start--
+     */
+    @Path("users")
+    public UsersResource getApplicationDefaultByName( @Context UriInfo ui )
             throws Exception {
 
+    
+    	
+    	String applicationName = getDefaultSpaceName(organizationName);
+    		
+    	
+    	
         if (logger.isTraceEnabled()) {
             logger.trace("getApplicationByName: {}", applicationName);
         }
@@ -139,7 +147,43 @@ public class OrganizationResource extends AbstractContextResource {
 
         String orgAppName = PathingUtils.assembleAppName( organizationName, applicationName );
         UUID optionalAppId = emf.lookupApplication( orgAppName );
+        
+        if ( optionalAppId == null ) {
 
+            // TODO: fix this hacky work-around for apparent Jersey issue
+            UUID applicationId = UUIDUtils.tryExtractUUID( applicationName );
+
+            if ( applicationId == null ) {
+                throw new OrganizationApplicationNotFoundException( orgAppName, uriInfo, properties, management );
+            }else{
+                optionalAppId = applicationId;
+            }
+        }
+
+        return appResourceForDefault( optionalAppId , ui );
+    }
+    
+    
+    @Path("{applicationName}")
+    public ApplicationResource getApplicationByName( @PathParam("applicationName") String applicationName )
+            throws Exception {
+
+        if (logger.isTraceEnabled()) {
+            logger.trace("getApplicationByName: {}", applicationName);
+        }
+
+        if( applicationName !=null && applicationName.equals("users")) {
+    		applicationName = getDefaultSpaceName(organizationName);
+    		
+    	}
+        
+        if ( "options".equalsIgnoreCase( request.getMethod() ) ) {
+            throw new NoOpException();
+        }
+
+        String orgAppName = PathingUtils.assembleAppName( organizationName, applicationName );
+        UUID optionalAppId = emf.lookupApplication( orgAppName );
+        
         if ( optionalAppId == null ) {
 
             // TODO: fix this hacky work-around for apparent Jersey issue
@@ -183,4 +227,18 @@ public class OrganizationResource extends AbstractContextResource {
         @Context UriInfo ui, @QueryParam("callback") @DefaultValue("callback") String callback ) throws Exception {
         throw new NotImplementedException( "Organization delete is not allowed yet" );
     }
+    
+    /*
+     * --Nupin--start--
+     */
+    private UsersResource appResourceForDefault( UUID applicationId , @Context UriInfo ui ) throws Exception {
+        if ( applicationId.equals( emf.getManagementAppId() ) && !SubjectUtils.isServiceAdmin() ) {
+            throw new UnauthorizedException();
+        }
+
+        return getSubResource( ApplicationResource.class ).initDefault( applicationId, ui );
+    }
+    /*
+     * --end--
+     */
 }

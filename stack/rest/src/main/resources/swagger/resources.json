@@ -10,6 +10,10 @@
     {
       "path": "/management.{format}",
       "description": "Management"
+    },
+    {
+      "path": "/users.{format}",
+      "description": "Users"
     }
   ]
 }

@@ -88,7 +88,14 @@ public class ApplicationResource extends CollectionResource {
 
     UUID applicationId;
     QueueManager queues;
-
+    /*
+     * --Nupin--start--
+     */
+    UUID orgApplicationId;
+    QueueManager orgQueues;
+    /*
+     * --end--
+     */
 
     public ApplicationResource() {
     }
@@ -96,11 +103,33 @@ public class ApplicationResource extends CollectionResource {
 
     public ApplicationResource init( UUID applicationId ) throws Exception {
         this.applicationId = applicationId;
+     
         services = smf.getServiceManager( applicationId );
         queues = qmf.getQueueManager( applicationId );
+        /*
+         * --Nupin--start--
+         */
+        orgApplicationId = getOrgSpaceId(getOrganizationName());
+        orgServices = smf.getServiceManager( getOrgSpaceId(getOrganizationName()) );
+        orgQueues = qmf.getQueueManager( orgApplicationId );
+       
+        /*
+         * --end--
+         */
         return this;
     }
 
+    public UsersResource initDefault( UUID applicationId, @Context UriInfo ui ) throws Exception {
+        this.applicationId = applicationId;
+     
+        services = smf.getServiceManager( applicationId );
+        queues = qmf.getQueueManager( applicationId );
+        
+        return getUsers( ui );
+        
+        
+    }
+    
 
     public QueueManager getQueues() {
         return queues;

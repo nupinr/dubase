@@ -84,7 +84,16 @@ public class CpRelationManager implements RelationManager {
     private org.apache.usergrid.persistence.model.entity.Entity cpHeadEntity;
 
     private final ApplicationScope applicationScope;
-
+    
+    /*
+     * --Nupin--start--
+     */
+    private UUID orgAppId;
+    
+    private final ApplicationScope orgAppScope;
+    /*
+     * --end--
+     */
     private final AsyncEventService indexService;
 
     private final CollectionSettingsFactory collectionSettingsFactory;
@@ -121,6 +130,15 @@ public class CpRelationManager implements RelationManager {
         this.managerCache = managerCache;
         this.applicationScope = CpNamingUtils.getApplicationScope( applicationId );
 
+        /*
+         * --Nupin--start--
+         * avoiding compile time error due to the final variable
+         */
+        this.orgAppScope = null ;
+        /*
+         * --end--
+         */
+        
         this.collectionService = collectionService;
         this.connectionService = connectionService;
 
@@ -142,7 +160,66 @@ public class CpRelationManager implements RelationManager {
         this.collectionSettingsFactory = collectionSettingsFactory;
 
     }
+    
+    /*
+     * --Nupin--start--
+     * copying the existing constructor to add extra params for supporting orglevel
+     */
+    
+    public CpRelationManager( final ManagerCache managerCache,
+    		final AsyncEventService indexService, final CollectionService collectionService,
+    		final ConnectionService connectionService,
+    		final EntityManager em, final EntityManager orgApp , final UUID orgAppId ,
+    		final EntityManagerFig entityManagerFig, final UUID applicationId,
+    		final CollectionSettingsFactory collectionSettingsFactory,
+    		final EntityRef headEntity) {
 
+
+    	Assert.notNull( em, "Entity manager cannot be null" );
+    	Assert.notNull( applicationId, "Application Id cannot be null" );
+    	Assert.notNull( headEntity, "Head entity cannot be null" );
+    	Assert.notNull( headEntity.getUuid(), "Head entity uuid cannot be null" );
+    	Assert.notNull( indexService, "indexService cannot be null" );
+    	Assert.notNull( collectionService, "collectionService cannot be null" );
+    	Assert.notNull( connectionService, "connectionService cannot be null" );
+
+    	this.entityManagerFig = entityManagerFig;
+
+    	// TODO: this assert should not be failing
+    	//Assert.notNull( indexBucketLocator, "indexBucketLocator cannot be null" );
+    	this.em = em;
+    	this.applicationId = applicationId;
+    	this.headEntity = headEntity;
+    	this.managerCache = managerCache;
+    	this.applicationScope = CpNamingUtils.getApplicationScope( applicationId );
+    	//
+    	this.orgAppScope = CpNamingUtils.getApplicationScope( orgAppId );
+    	//
+
+    	this.collectionService = collectionService;
+    	this.connectionService = connectionService;
+
+    	if ( logger.isDebugEnabled() ) {
+    		logger.debug( "Loading head entity {}:{} from app {}",
+    				headEntity.getType(), headEntity.getUuid(), applicationScope
+    				);
+    	}
+
+    	Id entityId = new SimpleId( headEntity.getUuid(), headEntity.getType() );
+
+    	this.cpHeadEntity = ( ( CpEntityManager ) em ).load( entityId );
+
+    	// commented out because it is possible that CP entity has not been created yet
+    	Assert.notNull( cpHeadEntity, String
+    			.format( "cpHeadEntity cannot be null for entity id %s, app id %s", entityId.getUuid(), applicationId ) );
+
+    	this.indexService = indexService;
+    	this.collectionSettingsFactory = collectionSettingsFactory;
+
+    }
+    /*
+     * --end--
+     */
 
     @Override
     public Set<String> getCollectionIndexes( String collectionName ) throws Exception {

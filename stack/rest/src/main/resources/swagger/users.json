@@ -1,0 +1,76 @@
+{
+  "basePath" : "${basePath}",
+  "swaggerVersion" : "1.1-SHAPSHOT.121026",
+  "apiVersion" : "0.1",
+  "apis" : [ {
+  		"path" : "/organizations/{org_name_or_uuid}/users/{user_username_email_or_uuid}",
+    "description" : "Users",
+    "operations" : [ {
+      "httpMethod" : "GET",
+      "nickname" : "org_user_get",
+      "summary" : "Returns the org user details",
+      "notes" : "Returns the org user details.",
+      "responseTypeInternal" : "",
+      "responseClass" : "response",
+      "parameters" : [ {
+        "name" : "access_token",
+        "dataType" : "string",
+        "description" : "The OAuth2 access token",
+        "required" : true,
+        "allowMultiple" : false,
+        "paramType" : "query"
+      }, {
+        "name" : "user_username_email_or_uuid",
+        "dataType" : "string",
+        "description" : "User username, email or uuid",
+        "required" : true,
+        "allowMultiple" : false,
+        "paramType" : "path"
+      } ],
+      "errorResponses" : [ {
+        "reason" : "Invalid ID supplied",
+        "code" : 400
+      }, {
+        "reason" : "Application not found",
+        "code" : 404
+      } ]
+    }, {
+      "httpMethod" : "PUT",
+      "nickname" : "org_user_json_put",
+      "summary" : "Updates the org user details",
+      "notes" : "Updates the org user details.",
+      "responseTypeInternal" : "",
+      "responseClass" : "response",
+      "parameters" : [ {
+        "name" : "access_token",
+        "dataType" : "string",
+        "description" : "The OAuth2 access token",
+        "required" : true,
+        "allowMultiple" : false,
+        "paramType" : "query"
+      }, {
+        "name" : "user_username_email_or_uuid",
+        "dataType" : "string",
+        "description" : "User username, email or uuid",
+        "required" : true,
+        "allowMultiple" : false,
+        "paramType" : "path"
+      }, {
+        "name" : "json",
+        "dataType" : "string",
+        "description" : "Org user details",
+        "required" : true,
+        "allowMultiple" : false,
+        "paramType" : "body"
+      } ],
+      "errorResponses" : [ {
+        "reason" : "Invalid ID supplied",
+        "code" : 400
+      }, {
+        "reason" : "Application not found",
+        "code" : 404
+      } ]     
+    } ]
+  } ]
+ }
+ 	

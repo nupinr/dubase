@@ -48,12 +48,15 @@ import org.apache.amber.oauth2.common.message.OAuthResponse;
 import org.apache.commons.lang.StringUtils;
 
 import org.apache.usergrid.management.ActivationState;
+import org.apache.usergrid.management.UserInfo;
+import org.apache.usergrid.mq.QueueManager;
 import org.apache.usergrid.persistence.CredentialsInfo;
 import org.apache.usergrid.persistence.EntityManager;
 import org.apache.usergrid.persistence.entities.User;
 import org.apache.usergrid.persistence.index.query.Identifier;
 import org.apache.usergrid.rest.AbstractContextResource;
 import org.apache.usergrid.rest.ApiResponse;
+import org.apache.usergrid.rest.applications.CollectionResource;
 import org.apache.usergrid.rest.applications.ServiceResource;
 import org.apache.usergrid.rest.exceptions.RedirectionException;
 import org.apache.usergrid.rest.security.annotations.RequireApplicationAccess;
@@ -74,12 +77,18 @@ import static javax.servlet.http.HttpServletResponse.SC_OK;
 
 import static org.apache.usergrid.security.shiro.utils.SubjectUtils.*;
 import static org.apache.usergrid.utils.ConversionUtils.string;
-
+/*
+ * --Nupin--start--
+ */
+//Previous extending class was ServiceResource change to CollectionResource
+/*
+ * --end--
+ */
 
 @Component("org.apache.usergrid.rest.applications.users.UserResource")
 @Scope("prototype")
 @Produces(MediaType.APPLICATION_JSON)
-public class UserResource extends ServiceResource {
+public class UserResource extends CollectionResource {
 
     public static final String USER_EXTENSION_RESOURCE_PREFIX = "org.apache.usergrid.rest.applications.users.extensions.";
 
@@ -93,6 +102,13 @@ public class UserResource extends ServiceResource {
 
     String token;
 
+    /*
+     * --Nupin--start--
+     */
+    QueueManager queues;
+    /*
+     * --end--
+     */
 
     public UserResource() {
     }
@@ -100,6 +116,18 @@ public class UserResource extends ServiceResource {
 
     public UserResource init( Identifier userIdentifier ) throws Exception {
         this.userIdentifier = userIdentifier;
+        /*
+         * --Nupin--start--
+         * while adding permissions org level .
+         */        
+        if(services == null ) {
+        	
+        	services = smf.getServiceManager(smf.getManagementAppId());
+        	queues = qmf.getQueueManager( smf.getManagementAppId() );
+        }
+        /*
+         * --end--
+         */
         return this;
     }
 
