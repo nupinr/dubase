@@ -439,13 +439,10 @@ public class ServiceResource extends AbstractContextResource {
 //			addQueryParams( serviceParam, ui );
 			boolean checkServiceParam = exitsInServiceParameter( serviceParam , "users" ) ;
 			if( exitsInServiceParameter( serviceParam , "users" ) && !exitsInServiceParameter( serviceParam , "permissions" ) ) {
-//				r = services.newRequest( action, tree, serviceParam.size() >1 ? serviceParam.subList(0, 1) :serviceParam, payload ,
-//						returnInboundConnections, returnOutboundConnections );//need to check appid inside debugging
-//				response.setServiceRequest( r );
-//				results = r.execute();
-				
-				results = executeNewRequest(ui, response, r, action, tree, serviceParam.size() >1 ? serviceParam.subList(0, 1) :serviceParam, 
-						payload, returnInboundConnections, returnOutboundConnections,false);
+				//
+				r = getServiceRequestForParams(ui, action, tree, serviceParam.size() >1 ? serviceParam.subList(0, 1) :serviceParam, 
+						payload, returnInboundConnections, returnOutboundConnections, false, false);
+				results = executeNewRequest( response, r);
 
 				System.out.println(results.getId()+"user-entity-store"+"----------"+results.getObject());
 				if( payload != null && results.getId() != null ) {
@@ -457,12 +454,10 @@ public class ServiceResource extends AbstractContextResource {
 				checkServiceParam = exitsInServiceParameter( serviceParam , "permissions" ) ;
 				
 				if( checkServiceParam ) {
-//					r = services.newRequest( action, tree, serviceParam, payload,
-//							returnInboundConnections, returnOutboundConnections );
-//					response.setServiceRequest( r );
-//					results = r.execute();
-					results = executeNewRequest(ui, response, r, action, tree, serviceParam, payload, 
-							returnInboundConnections, returnOutboundConnections,false);
+					//
+					r = getServiceRequestForParams(ui, action, tree, serviceParam, payload, 
+							returnInboundConnections, returnOutboundConnections, false, false);
+					results = executeNewRequest(response, r);
 					System.out.println("entity-store"+"----------"+results.getObject());
 				} 
 				else 
@@ -472,21 +467,51 @@ public class ServiceResource extends AbstractContextResource {
 						applevel = true ;
 
 						serviceParam = serviceParam.subList(0, 1);
-						appPayload =  getAppEntityPayLoad(ServiceParameter.firstParameter(serviceParam).getName());
+						appPayload =  getAppEntityPayLoad(ServiceParameter.firstParameter(serviceParam).getName(),ServiceAction.GET);
 
-//						r = services.newRequest(ServiceAction.GET , tree, serviceParam,appPayload,
-//								returnInboundConnections, returnOutboundConnections );
-//						response.setServiceRequest( r );
-//						results = r.execute();
-						//GET need to be changed
-						results =  executeNewRequest(ui, response, r, ServiceAction.GET, tree, serviceParam, 
-								appPayload, returnInboundConnections, returnOutboundConnections,false);
+						r = getServiceRequestForParams(ui, ServiceAction.GET, tree, serviceParam, appPayload, 
+								returnInboundConnections, returnOutboundConnections, false, false);
+						results =  executeNewRequest(response, r);
+
+						System.out.println("entity-store1"+"----------"+results.getObject());
+						
+						if(!results.isEmpty()) {
+							if(action == ServiceAction.DELETE)
+							{
+//								serviceParam = new ArrayList<ServiceParameter>( getServiceParameters() ) ; 
+//								serviceParam = serviceParam.subList(0, 1);
+//								appPayload =  getAppEntityPayLoad(ServiceParameter.firstParameter(serviceParam).getName(),action);
+//
+//								r = getServiceRequestForParams(ui, ServiceAction.PUT, tree, serviceParam, appPayload, 
+//										returnInboundConnections, returnOutboundConnections, false, false);
+//								results =  executeNewRequest(response, r);
+							}
+						}
+						else
+						{
+							if(action == ServiceAction.DELETE) {
+								
+								throw new Exception("No Allowed "+action+" for Entity "+new ArrayList<ServiceParameter>( getServiceParameters() )) ;
+							}
+							else if(action == ServiceAction.POST || action == ServiceAction.PUT)
+							{
+								serviceParam = new ArrayList<ServiceParameter>( getServiceParameters() ) ; 
+								serviceParam = serviceParam.subList(0, 1);
+								appPayload =  getAppEntityPayLoad(ServiceParameter.firstParameter(serviceParam).getName(),action);
+
+								r = getServiceRequestForParams(ui, ServiceAction.POST, tree, serviceParam, appPayload, 
+										returnInboundConnections, returnOutboundConnections, false, false);
+								results =  executeNewRequest(response, r);
+							}
+							
+						}
 						
 						
-						System.out.println("entity-store"+"----------"+results.getObject());
+						System.out.println("entity-store2"+"----------"+results.getObject());
 						
 						version = results.getEntity().getProperty("version").toString();
-						extendedParam = results.getEntity().getProperty("extended");
+						extendedParam = results.getEntity().getProperty(version);
+						
 					}
 
 					
@@ -497,28 +522,29 @@ public class ServiceResource extends AbstractContextResource {
 		/*
 		 * Logic to redirect to org level app space for entities
 		 */
-		if( applevel ) 
+		System.out.println("oooooooooooooooo"+extendedParam);
+		List<String> find = (List<String>)extendedParam;//find.add("expiry");find.add("code");
+		System.out.println("oooooooooooooooo"+find);
+		
+		if( applevel && find.size()>0) 
 		{
+			/*
+			 * getting existing details on the the entity
+			 */
 			//Checking if entity exists 
 			serviceParam = new ArrayList<ServiceParameter>( getServiceParameters() ) ; 
-//			addQueryParams( serviceParam, ui );
-//			orgServices = smf.getServiceManager( getOrgSpaceId(getOrganizationName()) );
-//			// check if entity is present
-//			ServiceRequest orgR = orgServices.newRequest( ServiceAction.GET, tree, serviceParam, payload,
-//					returnInboundConnections, returnOutboundConnections );//need to check appid inside debugging
-//
-//
-//			if(r == null ) {
-//				r = orgR ;
-//			}
-//
-//			response.setServiceRequest( orgR );
-//			results = orgR.execute();
-
-			results = executeNewRequest(ui, response, r, ServiceAction.GET, tree, serviceParam, appPayload, 
-					returnInboundConnections, returnOutboundConnections, true);
+			r = getServiceRequestForParams(ui, ServiceAction.GET, tree, serviceParam, payload,
+					returnInboundConnections, returnOutboundConnections, true,false);
+			results = executeNewRequest(response, r);
 			
-			if(action != ServiceAction.DELETE ) {
+			if(!results.isEmpty() && action == ServiceAction.POST) {
+				throw new Exception("No Allowed "+action+" for Entity "+new ArrayList<ServiceParameter>( getServiceParameters() )) ;
+			}
+			
+			System.out.println("entity-store3"+"----------"+results.getObject());
+			
+			//
+			if(action != ServiceAction.DELETE && action != ServiceAction.GET) {
 
 				boolean newEntity = false ;
 
@@ -528,95 +554,24 @@ public class ServiceResource extends AbstractContextResource {
 
 				Stack<Object> payLoadSplit = new Stack<Object>();
 
+				//Hard coded value has to be changed
 				Stack<LinkedHashMap<Object,Object>> appMapStack = new Stack<LinkedHashMap<Object,Object>>();
-				List<String> find = new ArrayList<String>();find.add("expiry");find.add("code");
-
+				
+				//
 				String applicationName = services.getApplication().getApplicationName() ;
 
-				ServicePayload finalPayload = null ;
-
-				if( payload.isBatch() ) {
-					payLoadSplit = processFinalPayLoad((payload.getBatchProperties()), applicationName, find, payLoadSplit, appMapStack, version, true, newEntity) ;				
-				}
-				else 
-				{
-					payLoadSplit = processFinalPayLoad((payload.getProperties()), applicationName, find , payLoadSplit, appMapStack, version, true, newEntity) ;
-				}
-
-				System.out.println("|||--->>>"+payLoadSplit);System.out.println();System.out.println();
-
-				System.out.println("<<<--->>>"+appMapStack);System.out.println();System.out.println();
-
-				Object payload1 = payLoadSplit.pop();
-				System.out.println("xxxx"+payload1);
-				Object splitPayLoad = payLoadSplit.pop();
-				//				appMap.put("slack", val2);
-				System.out.println("yyyy"+splitPayLoad);
-
-				if(appMapStack.size()>1) {
-
-					for(int i=0; i < appMapStack.size() ; i++) {
-						appMapStack.get(i).put(applicationName, ((List)splitPayLoad).get(i));
-						if(newEntity){
-							Set<String> appSet = new HashSet<String>();appSet.add(applicationName);
-							appMapStack.get(i).put("applications", appSet);
-						}
-						System.out.println("$$$$"+appMapStack.get(i).get("slack"));
-
-					}
-				}
-				else {
-					List<Object> a = new ArrayList<Object>();a.add(payload1);
-					if(splitPayLoad instanceof List) {
-
-						LinkedHashMap<Object,Object> map = appMapStack.get(0) ;
-						System.out.println("1####1"+map);
-						map.put(applicationName, splitPayLoad);
-						System.out.println("2####2"+map);
-					}
-					else
-					{
-						System.out.println("3#####3"+appMapStack.get(0).get(applicationName));
-						appMapStack.get(0).put(applicationName, a);
-					}
-				}
-
-				System.out.println("appMapStack########"+appMapStack);
-				finalPayload = ServicePayload.jsonPayload(appMapStack);
-
-				System.out.println(finalPayload);
-
-				System.out.println("xxxxxxx"+finalPayload);
-
-				//			int  k = 1/0 ;
+				ServicePayload finalPayload = getFinalPayLoad(payload, version, newEntity, payLoadSplit, appMapStack, find, applicationName) ;
 
 				//
-				if(action.equals(ServiceAction.POST)) {
+				if( action == ServiceAction.POST ) {
+					//
 					serviceParam = new ArrayList<ServiceParameter>( getServiceParameters() ) ; 
-//					addQueryParams( serviceParam, ui );
-//					orgServices = smf.getServiceManager( getOrgSpaceId(getOrganizationName()) );
-//					// check if entity is present
-//					orgR = orgServices.newRequest( action, tree, serviceParam, finalPayload,
-//							returnInboundConnections, returnOutboundConnections );//need to check appid inside debugging
-//
-//					/*
-//					 * --Nupin -- Need to trmove . Just added to avoid compile errors
-//					 */
-//					if(r == null ) {
-//						r = orgR ;
-//					}
-//					/*
-//					 * --end--
-//					 */
-//
-//					response.setServiceRequest( orgR );
-//					results = orgR.execute();
-					
-					results = executeNewRequest(ui, response, r, action, tree, serviceParam, finalPayload, 
-							returnInboundConnections, returnOutboundConnections, true);
+					r = getServiceRequestForParams(ui, action, tree, serviceParam, finalPayload,
+							returnInboundConnections, returnOutboundConnections, true, false);
+					results = executeNewRequest(response, r);
 					
 				}
-				else if(action.equals(ServiceAction.PUT) && !results.isEmpty()) {
+				else if( action == ServiceAction.PUT  && !results.isEmpty()) {
 
 					Set<String> appList = null ;
 
@@ -651,32 +606,14 @@ public class ServiceResource extends AbstractContextResource {
 
 					System.out.println("appMapStack!!!!!!!!!"+appMapStack);
 					//				int i = 1/0 ;		
-
+					//
 					serviceParam = new ArrayList<ServiceParameter>( getServiceParameters() ) ; 
-
-//					addQueryParams( serviceParam, ui );
-//					orgServices = smf.getServiceManager( getOrgSpaceId(getOrganizationName()) );
-//					// check if entity is present
-//					orgR = orgServices.newRequest( action, tree, serviceParam, finalPayload,
-//							returnInboundConnections, returnOutboundConnections );//need to check appid inside debugging
-//
-//					/*
-//					 * --Nupin -- Need to trmove . Just added to avoid compile errors
-//					 */
-//					if(r == null ) {
-//						r = orgR ;
-//					}
-//					/*
-//					 * --end--
-//					 */
-//
-//					response.setServiceRequest( orgR );
-//					results = orgR.execute();
-					results = executeNewRequest(ui, response, r, action, tree, serviceParam, finalPayload, 
-							returnInboundConnections, returnOutboundConnections, true);
+					r = getServiceRequestForParams(ui, action, tree, serviceParam, finalPayload,
+							returnInboundConnections, returnOutboundConnections, true, false);
+					results = executeNewRequest(response, r);
 				}
 			}
-			else 
+			else if(action != ServiceAction.GET)
 			{
 				if(!results.isEmpty()) {
 					for(Entity entity : results.getEntities()) {
@@ -689,41 +626,34 @@ public class ServiceResource extends AbstractContextResource {
 							{
 								String applicationName = services.getApplication().getApplicationName() ;
 								Object pay =  getPayLaadForDelete(entity, appSet, applicationName);
-								
-								System.out.println("deleted-------!!!!!"+pay);
-								int a = 1/0 ;
-								
+								ServicePayload finalPayload = ServicePayload.jsonPayload(pay);
+								System.out.println("deleted-------!!!!!"+finalPayload);
+//								int a = 1/0 ;
+								serviceParam = new ArrayList<ServiceParameter>( getServiceParameters() ) ; 
+								r = getServiceRequestForParams(ui, ServiceAction.PUT, tree, serviceParam, finalPayload,
+										returnInboundConnections, returnOutboundConnections, true, false);
+								results = executeNewRequest(response, r);
 							}
 							else 
 							{
-								int a = 1/0 ;
+//								int a = 1/0 ;
+								//
 								serviceParam = new ArrayList<ServiceParameter>( getServiceParameters() ) ; 
-
-//								addQueryParams( serviceParam, ui );
-//								orgServices = smf.getServiceManager( getOrgSpaceId(getOrganizationName()) );
-//								// check if entity is present
-//								orgR = orgServices.newRequest( action, tree, serviceParam, payload,
-//										returnInboundConnections, returnOutboundConnections );//need to check appid inside debugging
-//
-//								/*
-//								 * --Nupin -- Need to trmove . Just added to avoid compile errors
-//								 */
-//								if(r == null ) {
-//									r = orgR ;
-//								}
-//								/*
-//								 * --end--
-//								 */
-//
-//								response.setServiceRequest( orgR );
-//								results = orgR.execute();
-								results = executeNewRequest(ui, response, r, action, tree, serviceParam, payload, 
-										returnInboundConnections, returnOutboundConnections, true);
+								r = getServiceRequestForParams(ui, action, tree, serviceParam, payload,
+										returnInboundConnections, returnOutboundConnections, true,true);
+								results = executeNewRequest(response, r);
 							}
 						}
 					}
 				}
 			}
+		}
+		else
+		{
+			serviceParam = new ArrayList<ServiceParameter>( getServiceParameters() ) ; 
+			r = getServiceRequestForParams(ui, action, tree, serviceParam, payload,
+					returnInboundConnections, returnOutboundConnections, true, true);
+			results = executeNewRequest(response, r);
 		}
 		System.out.println("org-app"+"----------"+results.getObject());
 		if ( results != null ) {
@@ -1386,8 +1316,15 @@ public class ServiceResource extends AbstractContextResource {
 		return results;
 	}
 
-	private ServicePayload getAppEntityPayLoad(String serviceName) throws Exception {    	
-		return  ServicePayload.jsonPayload(readJsonToObject("[{\"name\":\""+pluralize(serviceName)+"\",\"type\":\""+(serviceName)+getVersionDiffParams()+"}]")) ;   	
+	private ServicePayload getAppEntityPayLoad(String serviceName, ServiceAction action) throws Exception {    
+		if(action == ServiceAction.DELETE) {
+			return ServicePayload.jsonPayload("{\"status\":\"deleted\"}");
+		}
+		else
+		{
+			return  ServicePayload.jsonPayload(readJsonToObject("[{\"name\":\""+pluralize(serviceName)+"\",\"type\":\""+
+					(serviceName)+getVersionDiffParams()+",\"status\":\"deleted\"}]")) ;   	
+		}
 	}
 
 	//Hardcoded values has to be removed
@@ -1493,45 +1430,117 @@ public class ServiceResource extends AbstractContextResource {
 		return false ;
 	}
 	
-	private ServiceResults executeNewRequest(UriInfo ui, ApiResponse response, ServiceRequest r, ServiceAction action, boolean tree, 
-			List<ServiceParameter> serviceParam, ServicePayload payload, boolean returnInboundConnections, 
-			boolean returnOutboundConnections, boolean orgApp) throws Exception {
+	private ServiceResults executeNewRequest( ApiResponse response, ServiceRequest r) throws Exception {
 		
-		addQueryParams( serviceParam, ui );
+		
+		response.setServiceRequest( r );
+		return r.execute();
+	}
+
+	private ServiceRequest getServiceRequestForParams(UriInfo ui, ServiceAction action, boolean tree, List<ServiceParameter> serviceParam, 
+			ServicePayload payload, boolean returnInboundConnections, 
+			boolean returnOutboundConnections, boolean orgApp, boolean considerQP) throws Exception {
+		ServiceRequest r = null ;
+		
 		if(!orgApp)
 		{
 			r = services.newRequest( action, tree, serviceParam, payload,
 					returnInboundConnections, returnOutboundConnections );
 		}
 		else
-		{
+		{	
+			if(considerQP) {
+				addQueryParams( serviceParam, ui );
+			}
 			orgServices = smf.getServiceManager( getOrgSpaceId(getOrganizationName()) );
 			r = orgServices.newRequest( action, tree, serviceParam, payload,
 					returnInboundConnections, returnOutboundConnections );
 		}
-		response.setServiceRequest( r );
-		return r.execute();
+		
+		return r ;
 	}
+	
+	private ServicePayload getFinalPayLoad(ServicePayload payload, String version, boolean newEntity, Stack<Object> payLoadSplit, 
+			Stack<LinkedHashMap<Object,Object>> appMapStack, List<String> find, String applicationName) {
+		
+		ServicePayload finalPayload = null ;
 
-	private LinkedHashMap getfinalPayloadToUpdate(Object entityObj, LinkedHashMap applicationMap, String applicationName) {
-		 {
-			
-			if(entityObj instanceof Map) {
-				for(Object key : ((Map)entityObj).keySet()) {
-					if(!applicationMap.containsKey(key)) {
-						applicationMap.put(key, ((Map)entityObj).get(key));
-					}
-				}
-				System.out.println("applicationmap1"+applicationMap);
-				return applicationMap ;
-			}
-			else if( entityObj instanceof List ) {
-				for(Object o : (List)entityObj) {
-					getfinalPayloadToUpdate(o, applicationMap, applicationName);
-				}
-				return applicationMap;
-			}				
+		if( payload.isBatch() ) {
+			payLoadSplit = processFinalPayLoad((payload.getBatchProperties()), applicationName, find, payLoadSplit, appMapStack, version, true, newEntity) ;				
 		}
+		else 
+		{
+			payLoadSplit = processFinalPayLoad((payload.getProperties()), applicationName, find , payLoadSplit, appMapStack, version, true, newEntity) ;
+		}
+
+		System.out.println("|||--->>>"+payLoadSplit);System.out.println();System.out.println();
+
+		System.out.println("<<<--->>>"+appMapStack);System.out.println();System.out.println();
+
+		Object payload1 = payLoadSplit.pop();
+		System.out.println("xxxx"+payload1);
+		Object splitPayLoad = payLoadSplit.pop();
+		//				appMap.put("slack", val2);
+		System.out.println("yyyy"+splitPayLoad);
+
+		if(appMapStack.size()>1) {
+
+			for(int i=0; i < appMapStack.size() ; i++) {
+				appMapStack.get(i).put(applicationName, ((List)splitPayLoad).get(i));
+				if(newEntity){
+					Set<String> appSet = new HashSet<String>();appSet.add(applicationName);
+					appMapStack.get(i).put("applications", appSet);
+				}
+				System.out.println("$$$$"+appMapStack.get(i).get("slack"));
+
+			}
+		}
+		else {
+			List<Object> a = new ArrayList<Object>();a.add(payload1);
+			if(splitPayLoad instanceof List) {
+
+				LinkedHashMap<Object,Object> map = appMapStack.get(0) ;
+				System.out.println("1####1"+map);
+				map.put(applicationName, splitPayLoad);
+				System.out.println("2####2"+map);
+			}
+			else
+			{
+				System.out.println("3#####3"+appMapStack.get(0).get(applicationName));
+				appMapStack.get(0).put(applicationName, a);
+			}
+		}
+
+		System.out.println("appMapStack########"+appMapStack);
+		finalPayload = ServicePayload.jsonPayload(appMapStack);
+
+		System.out.println(finalPayload);
+
+		System.out.println("xxxxxxx"+finalPayload);
+		
+		return finalPayload ;
+
+	}
+	
+	private LinkedHashMap getfinalPayloadToUpdate(Object entityObj, LinkedHashMap applicationMap, String applicationName) {
+
+
+		if(entityObj instanceof Map) {
+			for(Object key : ((Map)entityObj).keySet()) {
+				if(!applicationMap.containsKey(key)) {
+					applicationMap.put(key, ((Map)entityObj).get(key));
+				}
+			}
+			System.out.println("applicationmap1"+applicationMap);
+			return applicationMap ;
+		}
+		else if( entityObj instanceof List ) {
+			for(Object o : (List)entityObj) {
+				getfinalPayloadToUpdate(o, applicationMap, applicationName);
+			}
+			return applicationMap;
+		}				
+
 		System.out.println("applicationmap3"+applicationMap);
 		return applicationMap ;
 	}
@@ -1566,6 +1575,8 @@ public class ServiceResource extends AbstractContextResource {
 				payloadMap.put(appName,obj);
 			}
 		}
+		appSet.remove(applicationName);
+		payloadMap.put("applications",appSet);
 		
 		return payloadMap;
 	}
